@@ -24,7 +24,12 @@
         "node": ">=14"
     },
     "license": "MIT",
-    "devDependencies": {},
+    "devDependencies": {
+        "eslint": "^8.57.1",
+        "eslint-config-standard": "^17.1.0",
+        "eslint-plugin-mocha": "^10.5.0",
+        "eslint-plugin-unused-imports": "^4.1.4"
+    },
     "dependencies": {
         "@nocke/util": "^0"
     }
