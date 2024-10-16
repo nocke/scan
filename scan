@@ -4,4 +4,4 @@
 # thus this wrap makes it a bit more comfy...)
 
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
-/usr/bin/node "$scriptDir/_scan.js" "$@"
+/usr/bin/node "$scriptDir/src/_scan.js" "$@"
