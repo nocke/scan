@@ -1,0 +1,21 @@
+{
+	"eslint.validate": [
+	  "javascript"
+	],
+	"eslint.workingDirectories": [
+	  "."
+	],
+	"search.exclude": {
+	  "**/node_modules": true,
+	},
+	"workbench.settings.enableNaturalLanguageSearch": false,
+	// REF www.techiediaries.com/enable-json-comments-vs-code
+	"files.associations": {
+	  ".eslintrc.json": "jsonc"
+	},
+	"[javascript]": {
+	  "editor.defaultFormatter": "vscode.typescript-language-features",
+	  "javascript.preferences.quoteStyle": "single"
+	}
+  }
+
