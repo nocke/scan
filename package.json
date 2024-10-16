@@ -1,0 +1,31 @@
+{
+    "name": "@nocke/scan",
+    "description": "a rather handy little scan tool! scans A4 pages from the command line, contrast enhancement, pdf and jpg output, automation",
+    "version": "1.0.0",
+    "type": "module",
+    "author": "Frank Nocke",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/nocke/scan"
+    },
+    "keywords": [
+        "scan",
+        "scanning",
+        "commandline",
+        "cli",
+        "linux",
+        "ubuntu",
+        "scanimage",
+        "pdf",
+        "jpg",
+        "automation"
+    ],
+    "engines": {
+        "node": ">=14"
+    },
+    "license": "MIT",
+    "devDependencies": {},
+    "dependencies": {
+        "@nocke/util": "^0"
+    }
+}

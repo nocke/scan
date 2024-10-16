@@ -1,0 +1,10 @@
+node_modules/
+.eslintcache
+.cache
+
+# files just to analyze
+PREP_?*.*
+REF_?*.*
+
+# for now
+/package-lock.json

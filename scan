@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# (one can also call the javascript directly
+# but node still requires it to have the .js extension
+# thus this wrap makes it a bit more comfy...)
+
+scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
+/usr/bin/node "$scriptDir/_scan.js" "$@"
