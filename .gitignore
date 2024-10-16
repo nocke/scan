@@ -2,7 +2,11 @@ node_modules/
 .eslintcache
 .cache
 
-# files just to analyze
+# temp files
+*.temp.jpg
+*.temp.png
+
+# local reference files
 PREP_?*.*
 REF_?*.*
 
