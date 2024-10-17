@@ -2,13 +2,18 @@
 
 **a handy little command line scan tool!**
 
+I wrote this litte command line tool in nodejs, to get my weekly burecratic cruft of my desk and into my harddisk faster. No need to open a GUI, then wait to initialize, then think about scanner settings, then go for the save dialog every time...
+
 * Scans an A4 page (default scanner) to a path of your liking
 * Contrast enhancement (Histogram clamp: 10%-90%)
   (also helps reduce filesize if white is truly white)
-* Filename by command line or prompted (Zenity) while you scan (no time lost \o/)
-* Also scan to jpg and png
+* Filename by command line or prompted
+* scanning will happen while you determine your filename (=no time lost \o/)
+* Command-Line paths ensured to exist
+* Also scans to jpg and png
 * Lenient if you forget quotes around your path (concatenates)
-* All kinds of sanity checks
+* generated file sanitychecked ≥ 10 kb
+* generated file opened in default pdf viewer
 
 ### Usage: `scan [magicwords] [path]`
 
@@ -23,20 +28,20 @@
       scan png all "/path/to/filename"
 
 ### path 'magic'
-Some folder magic applied: If you do not explictly provide a folder, and current Dir happens to be the script location or home (which will be the likely case if you run if from the linux run prompt (alt-F2, Win-R,...), file will end up in `~/Pictures/scan` (for further sorting).
+Some folder magic applied: If you do not explictly provide a folder, and current Dir happens to be the script location or home (which will be the likely case if you run if from the linux run prompt (alt-F2, Win-R,...), file will end up in `~/Pictures/scan` (to rename and move to the appropriate place from there).
 
 
     ~ $> scan
 
-scans → `~/Pictures/scan/YYYY-MM-DD scan 01.pdf`
+being in your home folder, this scans → `~/Pictures/scan/YYYY-MM-DD scan 01.pdf`
 
 …or `…02.pdf`, `…03.pdf`, until something is not taken. Rename thereafter
 
     ~/someFolder $> scan
 
-scans → `~/someFolder/2024-10-16 scan 01`
+being in any otherfolder, this scans → `~/someFolder/2024-10-16 scan 01`. Same name collision avoidance as above.
 
-same name collision avoidance
+Of course, you can also provide a folder path:
 
     ~/wherever $> scan /depot/existingFolder
 
@@ -46,8 +51,7 @@ scans → `/depot/existingFolder/2024-10-16 scan 01`
 
 scans → `/depot/nonExistingName.pdf`
 
-if no folder exists, assumed to be the would-be filename (extension added if needed)
-No prompting for filename in this case, because you just gave one 👍
+If no folder exists, assumed to be the would-be filename (extension added if needed, and path leading there verified. To save you from accidental folder generation by typos.) No prompting for filename in this case, because you just gave one 👍
 
 Ruthless lowercasing of extension. (No `.PDF`. `.Pdf` ever.)
 
@@ -71,8 +75,9 @@ to use `convert`
 ### TODO
 
 * clean up `.scan-js.temp.jpg`
-* multi-page mate (with leading int as “magic word” resp. all for „keep asking mode“)
-* allow for actual file prompt (nice to use 'favorites' that come with that, too)
+* multi-page mode (with leading int as “magic word” resp. integer number all for „keep asking mode“)
+* allow for [actual file dialog](https://help.gnome.org/users/zenity/stable/file-selection.html.en) (with all the navigation benefits including 'favorites' of that)
+* jpg and png mode not just by magicword but also by virtue of giving a filename with extension
 
 ### LICENSE
 
