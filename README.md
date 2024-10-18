@@ -64,18 +64,15 @@ Rename if you think, `scan` is taken on your machine. (surprisingly it was not o
 
 ### linux package dependencies
 
-    sudo apt install sane-utils
+    sudo apt install sane-utils imagemagick kdialog
 
-to have `scanimage` (using the default scanner, I am not influencing any of that). Works for me with a Epson ET-2750.
-
-    sudo apt install imagemagick
-
-to use `convert`
+* `sane-utils` to have `scanimage` (using the default scanner, I am not influencing any of that). Works for me with a Epson ET-2750.
+* the very versatile image tool `imagemagick` delivers the `convert` command
+* `kdialog` allows for save dialogs (also allowing to suggest not-yet-existing filename. Zenity currently does not.)
 
 ### TODO
 
 * multi-page mode (with leading int as “magic word” resp. integer number all for „keep asking mode“)
-* allow for [actual file dialog](https://help.gnome.org/users/zenity/stable/file-selection.html.en) (with all the navigation benefits including 'favorites' of that)
 * jpg and png mode not just by magicword but also by virtue of giving a filename with extension
 * verbose mode (requires logLevel in @nocke/util)
 

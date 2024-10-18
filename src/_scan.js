@@ -28,14 +28,16 @@ const validFilename = /^[^<>:"/\\|?*, ]+([ .][^<>:"/\\|?*, .]+)*$/
  * Prompts the user for the final filename using zenity.
  * Ensures the filename is trimmed and has the correct extension.
  * Rejects if the filename is empty or only whitespace.
- * @param {string} defaultFilename - The default filename to suggest.
+ * @param {string} defaultFilePath - The default filename to suggest.
  * @param {string} ext - The desired file extension.
  * @returns {Promise<string|null>} - The sanitized filename or null.
  */
-const promptForUserFilename = (defaultFilename, ext) => {
-  const defaultName = path.basename(defaultFilename)
+const promptForUserFilename = (defaultFilePath, ext) => {
+  const escapedFilePath = defaultFilePath.replace(/ /g, '\\ ') // Escape spaces in the file path
   return new Promise((resolve, reject) => {
-    const command = `zenity --entry --title="Enter Filename" --text="Enter filename:" --entry-text="${defaultName}"`
+    const command = `kdialog --getsavefilename ${escapedFilePath}`
+    info(`command: ${command}`)
+
     exec(command, (error, stdout, _stderr) => {
       if (error) {
         reject(error)
