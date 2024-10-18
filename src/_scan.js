@@ -107,6 +107,8 @@ const scanAndConvert = async (targetDir, filename, ext, FAKEMODE = false) => {
       // Convert JPEG to PDF
       await execAsync(`convert "${tempFile}" -quality 75 -level 20%,90% "${fullFilename}"`)
       info('Conversion to PDF completed.')
+      await execAsync(`rm -f "${tempFile}"`)
+      info(`Temporary file '${tempFile}' removed after conversion.`)
     } else {
       // For JPG and PNG, no conversion needed
       fs.renameSync(tempFile, fullFilename)

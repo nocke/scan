@@ -74,10 +74,10 @@ to use `convert`
 
 ### TODO
 
-* clean up `.scan-js.temp.jpg`
 * multi-page mode (with leading int as “magic word” resp. integer number all for „keep asking mode“)
 * allow for [actual file dialog](https://help.gnome.org/users/zenity/stable/file-selection.html.en) (with all the navigation benefits including 'favorites' of that)
 * jpg and png mode not just by magicword but also by virtue of giving a filename with extension
+* verbose mode (requires logLevel in @nocke/util)
 
 ### LICENSE
 
