@@ -6,7 +6,7 @@ import fs from 'fs'
 import path from 'path'
 import { exec } from 'child_process'
 import { promisify } from 'util'
-import { green, important, info, purple } from '@nocke/util'
+import { green, important, info, purple, warn } from '@nocke/util'
 
 const execAsync = promisify(exec)
 
@@ -90,15 +90,11 @@ const scanAndConvert = async (targetDir, filePath, ext, DRYRUN = false) => {
     if (DRYRUN) {
 
       info('FAKEMODE enabled. Using preexisting temp file.')
-      info('targetDir:', targetDir)
-      info('filePath:', filePath)
-      info('tempFile:', tempFile)
+      const mockTempFile = path.join(scriptDir, 'fake_temp.jpg')
+      info(`cp "${mockTempFile}" "${tempFile}"`)
+      await execAsync(`cp "${mockTempFile}" "${tempFile}"`)
 
-      const fakeTempFile = path.join(scriptDir, 'fake_temp.jpg')
-      info(`cp "${fakeTempFile}" "${tempFile}"`)
-      await execAsync(`cp "${fakeTempFile}" "${tempFile}"`)
-
-    } else { // REAL MODE
+    } else { // real mode
       await execAsync(`rm -f "${tempFile}"`)
       info(`temporary file '${tempFile}' removed.`)
       if (ext === 'pdf') { // scan as JPEG for PDF conversion
@@ -114,17 +110,15 @@ const scanAndConvert = async (targetDir, filePath, ext, DRYRUN = false) => {
     }
 
     if (ext === 'pdf') { // convert JPEG to PDF
-      important(`convert "${tempFile}" -quality 75 -level 20%,90% "${filePath}"`)
+      info(`convert "${tempFile}" -quality 75 -level 20%,90% "${filePath}"`)
       await execAsync(`convert "${tempFile}" -quality 75 -level 20%,90% "${filePath}"`)
-      info('Conversion to PDF completed.')
       await execAsync(`rm -f "${tempFile}"`)
-      info(`Temporary file '${tempFile}' removed after conversion.`)
     } else { // for JPG and PNG, no conversion is needed
       fs.renameSync(tempFile, filePath)
-      info('Scan directly saved as', filePath)
+      info('scan directly saved as', filePath)
     }
   } catch (error) {
-    console.error('Error during scan and convert:', error)
+    console.error('error during scan and convert:', error)
     throw error // Re-throw to allow upstream handling
   }
 }
@@ -259,7 +253,7 @@ const scanToFile = () => {
       }
       args.shift() // Remove the processed magic word
     } else if (/^\d{1,3}$/.test(arg)) {
-      // Arg is a whole number between 1 and 999
+      // arg is a whole number between 1 and 999
       numOfPages = parseInt(arg, 10)
       multiPage = true
       args.shift()
@@ -277,13 +271,12 @@ const scanToFile = () => {
   if (ext === '') {
     ext = outputFormat
   } else if (outputFormat !== 'pdf' && ext !== outputFormat) {
-    important(`you requested format '${outputFormat}' but gave extension '${ext}'`)
+    warn(`you requested format '${outputFormat}' but gave extension '${ext}'`)
     process.exit()
   }
 
   if (basename === '') {
     basename = getDefaultFilename(dir, outputFormat)
-    important(`************* suggestedBasename: '${basename}'`)
     ext = outputFormat
     promptingNeeded = true
   }
@@ -296,14 +289,14 @@ const scanToFile = () => {
   const fileName = `${basename}.${ext}`
   const filePath = path.join(dir, fileName)
 
-  info(purple(`currentDir: ${currentDir}`))
-  info(purple(`homeDir: ${homeDir}`))
-  info(purple(`scriptDir: ${scriptDir}`))
+  //   info(purple(`currentDir: ${currentDir}`))
+  //   info(purple(`homeDir: ${homeDir}`))
+  //   info(purple(`scriptDir: ${scriptDir}`))
   info(purple(`numOfPages: ${numOfPages}`))
   info(purple(`multiPage: ${multiPage}`))
-  info('promptingNeeded:', promptingNeeded)
-  info('-------------------------------')
-  info(purple(`outputFormat | ext:   '${outputFormat}' | '${ext}'`))
+  //   info('promptingNeeded:', promptingNeeded)
+  //   info('-------------------------------')
+  //   info(purple(`outputFormat | ext:   '${outputFormat}' | '${ext}'`))
   info(green(`dir | basename | ext:\n '${dir}' | '${basename}' | '${ext}'`))
 
   // scan and prompt concurrently
@@ -313,9 +306,6 @@ const scanToFile = () => {
 
   Promise.all([promptPromise, scanPromise])
     .then(([finalFilePath]) => {
-
-      info(`(source) filePath: ${filePath}`)
-      info(`finalFilename:     ${finalFilePath}`)
 
       if (filePath !== finalFilePath) {
         fs.renameSync(filePath, finalFilePath)
@@ -333,13 +323,12 @@ const scanToFile = () => {
       }
 
       if (openFlag) {
-        info(`Opening ${finalFilePath}`)
         exec(`xdg-open "${finalFilePath}"`)
       }
     })
     .catch(err => {
       console.error('An error occurred:', err)
-      process.exit(1) // Exit with a non-zero status code
+      process.exit(1)
     })
 }
 
