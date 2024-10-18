@@ -72,9 +72,10 @@ Rename if you think, `scan` is taken on your machine. (surprisingly it was not o
 
 ### TODO
 
-* multi-page mode (with leading int as “magic word” resp. integer number all for „keep asking mode“)
+* multi-page mode
 * jpg and png mode not just by magicword but also by virtue of giving a filename with extension
 * verbose mode (requires logLevel in @nocke/util)
+* ask before over overwrite (after scan+prompt)
 
 ### LICENSE
 

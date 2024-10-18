@@ -14,6 +14,8 @@ const scriptDir = path.dirname(new URL(import.meta.url).pathname)
 const homeDir = process.env.HOME || '~'
 const currentDir = process.cwd()
 
+const knownExtensions = ['pdf', 'jpg', 'png']
+
 /*
  [^<>:"/\\|?*]+: → Starts with one or more valid characters, excluding illegal ones.
  ([ \.][^<>:"/\\|?*]+)* → Allows either a space or a dot followed by more valid characters.
@@ -22,43 +24,48 @@ const currentDir = process.cwd()
 
  NOTE: in character classes ([...]), the dot (.) doesn't need to be escaped because it's treated as a literal dot
 */
-const validFilename = /^[^<>:"/\\|?*, ]+([ .][^<>:"/\\|?*, .]+)*$/
+const validFilename = /^[^<>:"'`/\\|?*,\s]+([ .][^<>:"'`/\\|?*,\s.]+)*$/
+
+// only weakness: …/egal. pdf
+const validFilePath = /^(\.?\.?\/)?([^<>:"'`\/\\|?*,\s]+( [^<>:"'`/\\|?*,\s]+)*)?(\/([^<>:"'`/\\|?*,\s]+( [^<>:"'`/\\|?*,\s]+)*)?)*$/
+
 
 /**
  * Prompts the user for the final filename using zenity.
  * Ensures the filename is trimmed and has the correct extension.
  * Rejects if the filename is empty or only whitespace.
- * @param {string} defaultFilePath - The default filename to suggest.
- * @param {string} ext - The desired file extension.
- * @returns {Promise<string|null>} - The sanitized filename or null.
+ * @param {string} sourceFilePath - full filepath incl. extension
+ * @param {string} ext
+ * @returns {Promise<string|null>} - the user-desired, sanitized filename or null.
  */
-const promptForUserFilename = (defaultFilePath, ext) => {
-  const escapedFilePath = defaultFilePath.replace(/ /g, '\\ ') // Escape spaces in the file path
+const promptForUserFilename = (sourceFilePath, ext) => {
+
+  // kdialog wants this, no quotes
+  const escapedSourceFilePath = sourceFilePath.replace(/ /g, '\\ ')
+
   return new Promise((resolve, reject) => {
-    const command = `kdialog --getsavefilename ${escapedFilePath}`
+    const command = `kdialog --getsavefilename ${escapedSourceFilePath}`
     info(`command: ${command}`)
 
     exec(command, (error, stdout, _stderr) => {
       if (error) {
         reject(error)
       } else {
-        let filename = stdout // No initial trim here
-
-        // Prevent leading and trailing whitespace
+        let filename = stdout
         filename = filename.trim()
 
-        // Avoid double extensions
+        // add extension if missing
         if (!filename.toLowerCase().endsWith(`.${ext}`)) {
           filename += `.${ext}`
         }
 
-        // Normalize extension to lowercase
-        filename = filename.replace(/\.[^.]+$/, (extension) => extension.toLowerCase()).trim()
+        // normalize known extensions to lowercase, hunt some whitespace
+        filename = filename.replace(/\s*\.\s*(pdf|jpg|png)\s*$/i, (_match, ext) => `.${ext.toLowerCase()}`).trim()
 
-        // Ensure the filename is not empty after trimming
-        if (filename === `.${ext}`) { // User entered only whitespace
-          reject(new Error('Filename cannot be empty or whitespace only.'))
-          return
+        // ensure the filename is not empty after trimming
+        if (!validFilePath.test(filename)) {
+          important(`invalid filename '${filename}' provided by user prompt.`)
+          process.exit(1)
         }
 
         resolve(filename || null) // Return null if input is empty
@@ -70,81 +77,56 @@ const promptForUserFilename = (defaultFilePath, ext) => {
 /**
  * Scans and converts the scanned image to the desired format.
  * In FAKEMODE, it uses a preexisting temp file.
- * @param {string} targetDir - The directory to save files.
- * @param {string} filename - The base filename without extension.
- * @param {string} ext - The desired file extension (e.g., 'pdf', 'jpg', 'png').
- * @param {boolean} FAKEMODE - Whether to use fake scanning.
+ * @param {string} dir - The directory to save files (also used for the temp file)
+ * @param {string} filePath - full target file path
+ * @param {string} ext
+ * @param {boolean} DRYRUN - whether to skip actual scanning (using committed test jpg)
  */
-const scanAndConvert = async (targetDir, filename, ext, FAKEMODE = false) => {
-  const fullFilename = `${filename}.${ext}`
+const scanAndConvert = async (targetDir, filePath, ext, DRYRUN = false) => {
 
   const tempFile = path.join(targetDir, `.scan-js.temp.${ext === 'pdf' ? 'jpg' : ext}`)
 
   try {
-    if (FAKEMODE) {
+    if (DRYRUN) {
+
       info('FAKEMODE enabled. Using preexisting temp file.')
+      info('targetDir:', targetDir)
+      info('filePath:', filePath)
+      info('tempFile:', tempFile)
+
       const fakeTempFile = path.join(scriptDir, 'fake_temp.jpg')
-      if (!fs.existsSync(fakeTempFile)) {
-        throw new Error(`Fake temp file does not exist at ${fakeTempFile}`)
-      }
+      info(`cp "${fakeTempFile}" "${tempFile}"`)
       await execAsync(`cp "${fakeTempFile}" "${tempFile}"`)
+
     } else { // REAL MODE
       await execAsync(`rm -f "${tempFile}"`)
       info(`temporary file '${tempFile}' removed.`)
-      if (ext === 'pdf') {
-        // Scan as JPEG for PDF conversion
+      if (ext === 'pdf') { // scan as JPEG for PDF conversion
         await execAsync(
-          `scanimage --verbose -p --resolution 300 --mode Color --format=jpeg -x 210 -y 297 > "${tempFile}"`
+                    `scanimage --verbose -p --resolution 300 --mode Color --format=jpeg -x 210 -y 297 > "${tempFile}"`
         )
-      } else {
-        // Scan directly as JPG or PNG
+      } else { // scan directly as JPG or PNG
         await execAsync(
-          `scanimage --verbose -p --resolution 300 --mode Color --format=${ext === 'jpg' ? 'jpeg' : ext} -x 210 -y 297 > "${tempFile}"`
+                    `scanimage --verbose -p --resolution 300 --mode Color --format=${ext === 'jpg' ? 'jpeg' : ext} -x 210 -y 297 > "${tempFile}"`
         )
       }
-      info('Scanning completed', FAKEMODE ? 'FAKEMODE' : '(real mode)')
+      info('Scanning completed', DRYRUN ? 'DRYRUN' : '(real mode)')
     }
 
-    if (ext === 'pdf') {
-      // Convert JPEG to PDF
-      await execAsync(`convert "${tempFile}" -quality 75 -level 20%,90% "${fullFilename}"`)
+    if (ext === 'pdf') { // convert JPEG to PDF
+      important(`convert "${tempFile}" -quality 75 -level 20%,90% "${filePath}"`)
+      await execAsync(`convert "${tempFile}" -quality 75 -level 20%,90% "${filePath}"`)
       info('Conversion to PDF completed.')
       await execAsync(`rm -f "${tempFile}"`)
       info(`Temporary file '${tempFile}' removed after conversion.`)
-    } else {
-      // For JPG and PNG, no conversion needed
-      fs.renameSync(tempFile, fullFilename)
-      info('Scan directly saved as', fullFilename)
+    } else { // for JPG and PNG, no conversion is needed
+      fs.renameSync(tempFile, filePath)
+      info('Scan directly saved as', filePath)
     }
   } catch (error) {
     console.error('Error during scan and convert:', error)
     throw error // Re-throw to allow upstream handling
   }
-}
-
-/**
- * Generates the next available filename in the target directory.
- * @param {string} targetDir - The directory to check for existing files.
- * @param {string} ext - The desired file extension.
- * @returns {string} - The next available filename without extension.
- */
-const createNextAvailableDefaultFilename = (targetDir, ext) => {
-  const baseFilename = `${new Date().toISOString().split('T')[0]} scan`
-  let index = 1
-  let candidateBase
-
-  while (index < 100) {
-    candidateBase = `${baseFilename} ${String(index).padStart(2, '0')}`
-    important(`candidateBase: ${candidateBase}`)
-
-    const candidatePath = path.join(targetDir, `${candidateBase}.${ext}`)
-
-    if (!fs.existsSync(candidatePath)) {
-      return candidateBase
-    }
-    index++
-  }
-  throw new Error('No available filename found')
 }
 
 /**
@@ -164,21 +146,32 @@ const getDestination = (args) => {
   const rawPath = args.join(' ').trim()
 
   if (rawPath === '') { // no path provided
-    return [avoidScriptAndHomeDir(currentDir), '']
+    return [avoidScriptAndHomeDir(currentDir), '', '']
   }
 
   if (fs.existsSync(rawPath) && fs.lstatSync(rawPath).isDirectory()) {
-    return [rawPath, ''] // here, even a desired homedir is fine
+    // no avoidScriptAndHomeDir(), because okay, if explicitly requested
+    return [rawPath, '', '']
   }
 
-  const possibleDir = path.dirname(rawPath) // would have to be existing dir (empty will be current '.')
-  const possibleFileName = path.basename(rawPath) // extract the (future) filename part
+  // possibly existing dir? (empty will be current '.')
+  const possibleDir = path.dirname(rawPath)
+
+  // possibly qualified filename?
+  const possibleFilename = path.basename(rawPath) // = basename + ext
+  let possibleExt = path.extname(rawPath).replace('.', '').toLocaleLowerCase()
+
+  // `.` just part of basename?
+  if (!knownExtensions.includes(possibleExt.toLowerCase())) {
+    possibleExt = ''
+  }
+  const possibleBasename = path.basename(rawPath, possibleExt === '' ? '' : '.' + possibleExt) // basename w/o extension
 
   important(`possibleDir: '${possibleDir}'`)
-  important(`possibleFileName: '${possibleFileName}'`)
+  important(`possibleExt: '${possibleExt}'`)
 
-  if (!validFilename.test(possibleFileName)) {
-    important(`invalid filename '${possibleFileName}'. Please check the provided path.`)
+  if (!validFilename.test(possibleFilename)) {
+    important(`invalid filename '${possibleFilename}'. Please check the provided path.`)
     process.exit(1) // user error, no ugly stack trace
   }
 
@@ -187,7 +180,32 @@ const getDestination = (args) => {
     process.exit(1) // user error, no ugly stack trace
   }
 
-  return [avoidScriptAndHomeDir(possibleDir), rawPath]
+  return [avoidScriptAndHomeDir(possibleDir), possibleBasename, possibleExt]
+}
+
+/**
+ * Generates the next available filename in the target directory.
+ * @param {string} targetDir - The directory to check for existing files.
+ * @param {string} ext - The desired file extension.
+ * @returns {string} - The next available filename without extension.
+ */
+const getDefaultFilename = (targetDir, ext) => {
+  const baseFilename = `${new Date().toISOString().split('T')[0]} scan`
+  let index = 1
+  let candidateBase
+
+  while (index < 100) {
+    candidateBase = `${baseFilename} ${String(index).padStart(2, '0')}`
+    important(`candidateBase: ${candidateBase}`)
+
+    const candidatePath = path.join(targetDir, `${candidateBase}.${ext}`)
+
+    if (!fs.existsSync(candidatePath)) {
+      return candidateBase
+    }
+    index++
+  }
+  throw new Error('No available filename found')
 }
 
 /**
@@ -197,8 +215,8 @@ const scanToFile = () => {
   let openFlag = true
   let FAKEMODE = false
   let multiPage = false
-  let numOfPages = 1 // Default is 1 page, 0 := unlimited „keep-asking-mode“
-  let outputFormat = 'pdf' // Default output format
+  let numOfPages = 1 // default, can become <n> pages or 0 := unlimited „keep-asking-mode“
+  let outputFormat = 'pdf'
   let promptingNeeded = false
 
   const args = process.argv.slice(2)
@@ -224,7 +242,7 @@ const scanToFile = () => {
 
   const magicWords = ['close', 'fake', 'all', 'jpg', 'png']
 
-  // Process magic words from the beginning of args
+  // process magic words from the beginning of args
   while (args.length > 0) {
     const arg = args[0].toLowerCase()
 
@@ -252,75 +270,71 @@ const scanToFile = () => {
   }
 
   // figure out path from remaining argument(s)
-  let [targetDir, suggestedFilename] = getDestination(args)
+  let [dir, basename, ext] = getDestination(args)
 
-  suggestedFilename = suggestedFilename.trim()
+  basename = basename.trim()
 
-  if (suggestedFilename === '') {
-    suggestedFilename = createNextAvailableDefaultFilename(targetDir, outputFormat)
+  if (ext === '') {
+    ext = outputFormat
+  } else if (outputFormat !== 'pdf' && ext !== outputFormat) {
+    important(`you requested format '${outputFormat}' but gave extension '${ext}'`)
+    process.exit()
+  }
+
+  if (basename === '') {
+    basename = getDefaultFilename(dir, outputFormat)
+    important(`************* suggestedBasename: '${basename}'`)
+    ext = outputFormat
     promptingNeeded = true
   }
 
-  if (suggestedFilename.toLowerCase().endsWith(`.${outputFormat}`)) {
-    info('removing already attached extension if meaning type', suggestedFilename)
-    suggestedFilename = suggestedFilename.slice(0, -(`.${outputFormat}`).length)
+  if (basename.toLowerCase().endsWith(`.${outputFormat}`)) {
+    info('removing already attached extension if meaning type', basename)
+    basename = basename.slice(0, -(`.${outputFormat}`).length)
   }
 
-  const scanFilePath = path.join(targetDir, suggestedFilename)
-  const ext = outputFormat
+  const fileName = `${basename}.${ext}`
+  const filePath = path.join(dir, fileName)
 
   info(purple(`currentDir: ${currentDir}`))
   info(purple(`homeDir: ${homeDir}`))
   info(purple(`scriptDir: ${scriptDir}`))
   info(purple(`numOfPages: ${numOfPages}`))
   info(purple(`multiPage: ${multiPage}`))
-  info(purple(`outputFormat (ext): ${outputFormat} (${ext})`))
-  info(green(`targetDir: ${targetDir}`))
-  info(green(`suggestedFilename: ${suggestedFilename}`))
-  info(purple('↓ ↓ ↓'))
-  info(purple(`scanFilePath: '${scanFilePath}'`))
+  info('promptingNeeded:', promptingNeeded)
+  info('-------------------------------')
+  info(purple(`outputFormat | ext:   '${outputFormat}' | '${ext}'`))
+  info(green(`dir | basename | ext:\n '${dir}' | '${basename}' | '${ext}'`))
 
-  // start scanning and prompting concurrently (don't waste time while picking names...)
-  const scanPromise = scanAndConvert(targetDir, scanFilePath, ext, FAKEMODE)
-  // only prompt if no name provided (i.e. nothing or only a path)
-  const promptPromise = (promptingNeeded) ? promptForUserFilename(scanFilePath, ext) : Promise.resolve(suggestedFilename)
+  // scan and prompt concurrently
+  // only prompt if no name explicitly provided (nothing / only a path)
+  const scanPromise = scanAndConvert(dir, filePath, ext, FAKEMODE)
+  const promptPromise = (promptingNeeded) ? promptForUserFilename(filePath, ext) : Promise.resolve(filePath)
 
   Promise.all([promptPromise, scanPromise])
-    .then(([finalFilename]) => {
-      const sourceFile = `${scanFilePath}.${ext}`
-      info(`sourceFile: ${sourceFile}`)
+    .then(([finalFilePath]) => {
 
-      let targetFile
+      info(`(source) filePath: ${filePath}`)
+      info(`finalFilename:     ${finalFilePath}`)
 
-      if (finalFilename) {
-        if (finalFilename.endsWith(`.${ext}`)) {
-          targetFile = path.join(targetDir, finalFilename)
-        } else {
-          targetFile = path.join(targetDir, `${finalFilename}.${ext}`)
-        }
+      if (filePath !== finalFilePath) {
+        fs.renameSync(filePath, finalFilePath)
+        info(`Scan saved and renamed from ${filePath} to ${finalFilePath}`)
       } else {
-        targetFile = sourceFile
-      }
-
-      if (finalFilename && finalFilename !== path.basename(scanFilePath)) {
-        fs.renameSync(sourceFile, targetFile)
-        info(`Scan saved and renamed from ${sourceFile} to ${targetFile}`)
-      } else {
-        info(`Scan directly saved as ${sourceFile}`)
+        info(`Scan directly saved as ${finalFilePath}`)
       }
 
       // finally sanity check
-      if (!fs.existsSync(targetFile)) {
-        throw new Error(`${targetFile} does not exist`)
+      if (!fs.existsSync(finalFilePath)) {
+        throw new Error(`'${finalFilePath}' does not exist`)
       }
-      if (fs.statSync(targetFile).size < 10 * 1024) { // > 10kb
-        throw new Error(`${targetFile} is smaller than 10KB.`)
+      if (fs.statSync(finalFilePath).size < 10 * 1024) { // < 10kb
+        throw new Error(`'${finalFilePath}' is smaller than 10KB.`)
       }
 
-      // Open the file if requested
       if (openFlag) {
-        info(`Opening ${targetFile}`)
-        exec(`xdg-open "${targetFile}"`)
+        info(`Opening ${finalFilePath}`)
+        exec(`xdg-open "${finalFilePath}"`)
       }
     })
     .catch(err => {
