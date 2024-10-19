@@ -24,10 +24,10 @@ const knownExtensions = ['pdf', 'jpg', 'png']
 
  NOTE: in character classes ([...]), the dot (.) doesn't need to be escaped because it's treated as a literal dot
 */
-const validFilename = /^[^<>:"'`/\\|?*,\s]+([ .][^<>:"'`/\\|?*,\s.]+)*$/
+const validFilename = /^[^<>:"'`/\\|?*\s]+([ .][^<>:"'`/\\|?*\s.]+)*$/
 
 // only weakness: …/egal. pdf
-const validFilePath = /^(\.?\.?\/)?([^<>:"'`\/\\|?*,\s]+( [^<>:"'`/\\|?*,\s]+)*)?(\/([^<>:"'`/\\|?*,\s]+( [^<>:"'`/\\|?*,\s]+)*)?)*$/
+const validFilePath = /^(\.?\.?\/)?([^<>:"'`\/\\|?*\s]+( [^<>:"'`/\\|?*\s]+)*)?(\/([^<>:"'`/\\|?*\s]+( [^<>:"'`/\\|?*\s]+)*)?)*$/
 
 
 /**
@@ -115,7 +115,7 @@ const scanAndConvert = async (targetDir, filePath, ext, DRYRUN = false) => {
       await execAsync(`rm -f "${tempFile}"`)
     } else { // for JPG and PNG, no conversion is needed
       fs.renameSync(tempFile, filePath)
-      info('scan directly saved as', filePath)
+      info(`pixel scan directly saved as ${purple(filePath)}`)
     }
   } catch (error) {
     console.error('error during scan and convert:', error)
@@ -311,7 +311,7 @@ const scanToFile = () => {
         fs.renameSync(filePath, finalFilePath)
         info(`Scan saved and renamed from ${filePath} to ${finalFilePath}`)
       } else {
-        info(`Scan directly saved as ${finalFilePath}`)
+        info(`Scan directly saved as\n${purple(finalFilePath)}`)
       }
 
       // finally sanity check
